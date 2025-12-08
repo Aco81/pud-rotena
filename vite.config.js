@@ -5,9 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    // Esto ayuda a depurar si algo falla
     sourcemap: true,
   },
-  // Esto asegura que las rutas funcionen bien en Vercel
-  base: './',
+  // Forzamos rutas relativas para evitar el error de importación
+  base: './', 
 })
