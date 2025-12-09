@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAnalytics } from "firebase/analytics";
 import { 
   getAuth, 
   signInAnonymously, 
@@ -39,19 +40,26 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE FIREBASE ---
-let app, auth, db;
+let app, auth, db, analytics;
+// Mantenemos appId para la estructura de rutas, aunque uses tu propia config.
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
+const firebaseConfig = {
+  apiKey: "AIzaSyA1MuetIpVz6ki2_mdhf4J831oMB8pw39A",
+  authDomain: "rotena-519e4.firebaseapp.com",
+  projectId: "rotena-519e4",
+  storageBucket: "rotena-519e4.firebasestorage.app",
+  messagingSenderId: "872970314926",
+  appId: "1:872970314926:web:577fcdc52aa0fb2aa7f93f",
+  measurementId: "G-ZWFN8WCQFN"
+};
+
 try {
-  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-  
-  if (firebaseConfig) {
-    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } else {
-    console.warn("Modo offline/demo activado (sin Firebase config).");
-  }
+  // Inicialización con tu configuración específica
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+  db = getFirestore(app);
+  analytics = getAnalytics(app);
 } catch (e) {
   console.error("Error inicializando Firebase:", e);
 }
@@ -534,8 +542,16 @@ export default function App() {
   useEffect(() => {
     if (!auth) return;
     const initAuth = async () => {
+        // En un entorno local, el token no coincidirá con tu config personalizada, 
+        // así que priorizamos el flujo anónimo si no hay token válido
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
+            try {
+              await signInWithCustomToken(auth, __initial_auth_token);
+            } catch (e) {
+              // Si falla (por ejemplo, token de otro proyecto), intentamos anónimo
+              console.warn("Fallo en auth con token, intentando anónimo...", e);
+              await signInAnonymously(auth);
+            }
         } else {
             await signInAnonymously(auth);
         }
@@ -548,6 +564,8 @@ export default function App() {
   useEffect(() => {
     if (!user || !db) return;
     
+    // Usamos appId en la ruta aunque el proyecto sea diferente, para mantener consistencia
+    // Asegúrate de que las reglas de seguridad de tu Firebase permitan escribir en /artifacts/{appId}/...
     const qRes = query(collection(db, 'artifacts', appId, 'public', 'data', 'reservations'));
     const unsubRes = onSnapshot(qRes, (snapshot) => {
       const resData = [];
@@ -566,6 +584,8 @@ export default function App() {
         if (!isExpired) resData.push({ id: docSnap.id, ...data });
       });
       setReservations(resData);
+    }, (error) => {
+      console.error("Error obteniendo reservas:", error);
     });
 
     const qAdmins = query(collection(db, 'artifacts', appId, 'public', 'data', 'admins'));
@@ -573,6 +593,8 @@ export default function App() {
       const adData = [];
       snapshot.forEach(doc => adData.push({ id: doc.id, ...doc.data() }));
       setAdmins(adData);
+    }, (error) => {
+       console.error("Error obteniendo admins:", error);
     });
 
     return () => {
