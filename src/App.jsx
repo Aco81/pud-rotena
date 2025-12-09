@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAnalytics } from "firebase/analytics";
+// import { getAnalytics } from "firebase/analytics"; // Desactivado temporalmente para depuración
 import { 
   getAuth, 
   signInAnonymously, 
@@ -40,9 +40,11 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE FIREBASE ---
-let app, auth, db, analytics;
-// Mantenemos appId para la estructura de rutas, aunque uses tu propia config.
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+let app, auth, db;
+let initialError = null;
+
+// Usamos un ID fijo en producción para asegurar que los datos se guarden siempre en el mismo sitio
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'rotena-public';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA1MuetIpVz6ki2_mdhf4J831oMB8pw39A",
@@ -56,12 +58,15 @@ const firebaseConfig = {
 
 try {
   // Inicialización con tu configuración específica
+  console.log("Intentando inicializar Firebase...");
   app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   auth = getAuth(app);
   db = getFirestore(app);
-  analytics = getAnalytics(app);
+  // analytics = getAnalytics(app); // Comentado para evitar bloqueos por AdBlockers/Entorno
+  console.log("Firebase inicializado correctamente.");
 } catch (e) {
-  console.error("Error inicializando Firebase:", e);
+  console.error("Error CRÍTICO inicializando Firebase:", e);
+  initialError = e.message;
 }
 
 // --- CONSTANTES ---
@@ -813,7 +818,27 @@ export default function App() {
     );
   };
 
-  if (!app) return <div className="p-10 text-center text-gray-500 animate-pulse">Iniciando P.U.D.R...</div>;
+  if (initialError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50 p-6">
+        <div className="text-center space-y-4 max-w-md">
+           <AlertTriangle size={48} className="text-red-500 mx-auto"/>
+           <h1 className="text-2xl font-bold text-red-900">Error de Inicio</h1>
+           <p className="text-red-700 bg-red-100 p-3 rounded-lg border border-red-200 font-mono text-sm break-words">{initialError}</p>
+           <p className="text-gray-600 text-sm">Por favor, revisa la configuración de Firebase y la consola del navegador.</p>
+           <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-red-700 text-white rounded-lg font-bold">Reintentar</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!app) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 space-y-4">
+       <div className="w-16 h-16 border-4 border-red-200 border-t-red-700 rounded-full animate-spin"></div>
+       <p className="text-gray-500 animate-pulse font-medium">Iniciando P.U.D.R...</p>
+       <p className="text-xs text-gray-400">Si esto tarda mucho, recarga la página.</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-10">
