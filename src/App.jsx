@@ -30,7 +30,7 @@ import {
   ChevronRight 
 } from 'lucide-react';
 
-console.log("[App.jsx] Cargando versión final corregida...");
+console.log("[App.jsx] Cargando versión v3.0 Final...");
 
 // --- VARIABLES GLOBALES ---
 let app = null;
@@ -307,6 +307,7 @@ export default function App() {
                     <div className="text-center">
                         <h1 className="text-3xl font-black text-red-900">P.U.D. Roteña</h1>
                         <p className="text-sm text-gray-500 font-medium">Gestión de Reservas</p>
+                        <p className="text-xs text-gray-400 mt-2">v3.0 Final</p>
                     </div>
                     <div className="w-full space-y-3">
                         <button onClick={() => setView('calendar')} className="w-full bg-white border-2 border-red-50 p-4 rounded-xl flex items-center gap-4 shadow-sm active:scale-95 transition-transform">
@@ -365,10 +366,10 @@ export default function App() {
             )}
         </main>
 
-        {/* MODAL RESERVA INTEGRADO */}
+        {/* MODAL RESERVA INTEGRADO (Aquí estaba el problema, ahora es código directo, no un componente) */}
         {isModalOpen && selectedBlock && (
-            <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden animate-slide-up">
+            <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden">
                     <div className="bg-red-700 p-4 text-white flex justify-between items-center">
                         <h3 className="font-bold">Reserva: {formatDateId(selectedBlock.date)}</h3>
                         <button onClick={() => setIsModalOpen(false)}><X/></button>
