@@ -30,7 +30,7 @@ import {
   ChevronRight 
 } from 'lucide-react';
 
-console.log("[App.jsx] Cargando versión v3.0 Final...");
+console.log("[App.jsx] Arrancando versión v3.2 (Safe ID)...");
 
 // --- VARIABLES GLOBALES ---
 let app = null;
@@ -47,7 +47,11 @@ const firebaseConfig = {
   measurementId: "G-ZWFN8WCQFN"
 };
 
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'rotena-public';
+// --- CORRECCIÓN CRÍTICA DE APP ID ---
+// Limpiamos el ID para evitar que contenga barras '/' que rompen Firestore
+const rawAppId = typeof __app_id !== 'undefined' ? __app_id : 'rotena-public';
+const appId = rawAppId.replace(/[^a-zA-Z0-9_-]/g, '_'); 
+
 const MASTER_ADMIN_ID = '123';
 const MASTER_ADMIN_PASS = 'test';
 const LOGO_DRIVE_URL = "https://drive.google.com/uc?export=view&id=1hdKsxPzNRXFE-P5vtvokNBPlwVPI4GH5";
@@ -109,7 +113,7 @@ const UDRLogo = ({ className }) => {
 // --- APP PRINCIPAL ---
 export default function App() {
   const [initStatus, setInitStatus] = useState('idle');
-  const [debugLogs, setDebugLogs] = useState(["[UI] Iniciando componente App..."]);
+  const [debugLogs, setDebugLogs] = useState(["[v3.2] Iniciando sistema..."]);
   const [initError, setInitError] = useState(null);
 
   const [user, setUser] = useState(null);
@@ -130,9 +134,12 @@ export default function App() {
   // Form
   const [formData, setFormData] = useState({ firstName: '', lastName: '', isMember: false, memberNumber: '' });
 
+  // --- LOGGING SEGURO (Evita crash por objetos) ---
   const addLog = (msg) => {
-    console.log(`[App Log] ${msg}`);
-    setDebugLogs(prev => [...prev, msg]);
+    // Convertimos cualquier cosa a String para evitar "Objects are not valid as React child"
+    const safeMsg = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : String(msg);
+    console.log(`[App Log] ${safeMsg}`);
+    setDebugLogs(prev => [...prev, safeMsg]);
   };
 
   // 1. EFECTO DE INICIALIZACIÓN
@@ -141,7 +148,7 @@ export default function App() {
 
     const runInit = async () => {
       setInitStatus('loading');
-      addLog("1. Ejecutando runInit()...");
+      addLog(`1. RunInit. AppID: ${appId.substring(0, 10)}...`);
 
       try {
         if (!getApps().length) {
@@ -171,40 +178,53 @@ export default function App() {
         });
 
       } catch (e) {
-        setInitError(e.message);
+        setInitError(e.message || String(e));
         setInitStatus('error');
-        addLog(`ERROR FATAL: ${e.message}`);
+        addLog(`ERROR FATAL: ${e.message || String(e)}`);
       }
     };
 
     runInit();
   }, [initStatus]);
 
-  // 2. DATA FETCHING
+  // 2. DATA FETCHING (Protegido con Try/Catch)
   useEffect(() => {
     if (initStatus !== 'success' || !user) return;
     
     addLog("5. Conectando a Base de Datos...");
     
-    // Escuchar reservas
-    const unsubRes = onSnapshot(
-        query(collection(db, 'artifacts', appId, 'public', 'data', 'reservations')), 
-        (snap) => {
-            const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            setReservations(data);
-        },
-        (err) => addLog(`Error BD Reservas: ${err.message}`)
-    );
+    let unsubRes = () => {};
+    let unsubAdmins = () => {};
 
-    // Escuchar admins
-    const unsubAdmins = onSnapshot(
-        query(collection(db, 'artifacts', appId, 'public', 'data', 'admins')),
-        (snap) => {
-            const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            setAdmins(data);
-        },
-        (err) => addLog(`Error BD Admins: ${err.message}`)
-    );
+    try {
+        // Reservas
+        const resRef = collection(db, 'artifacts', appId, 'public', 'data', 'reservations');
+        const qRes = query(resRef);
+        
+        unsubRes = onSnapshot(qRes, 
+            (snap) => {
+                const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                setReservations(data);
+            },
+            (err) => addLog(`Error BD Reservas: ${err.message}`)
+        );
+
+        // Admins
+        const adminRef = collection(db, 'artifacts', appId, 'public', 'data', 'admins');
+        const qAdmins = query(adminRef);
+        
+        unsubAdmins = onSnapshot(qAdmins,
+            (snap) => {
+                const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                setAdmins(data);
+            },
+            (err) => addLog(`Error BD Admins: ${err.message}`)
+        );
+
+    } catch (e) {
+        addLog(`ERROR CRÍTICO CONFIGURANDO BD: ${e.message}`);
+        console.error(e);
+    }
 
     return () => { unsubRes(); unsubAdmins(); };
   }, [initStatus, user]);
@@ -223,13 +243,13 @@ export default function App() {
                 </div>
             ) : (
                 <div className="text-center mb-4">
-                    <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
-                    <h2 className="text-lg font-bold text-gray-700">Iniciando App...</h2>
+                    <div className="w-10 h-10 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto mb-2"></div>
+                    <h2 className="text-lg font-bold text-gray-700">Cargando v3.2...</h2>
                 </div>
             )}
 
             <div className="bg-gray-900 text-green-400 p-3 rounded h-48 overflow-y-auto text-[10px] leading-tight shadow-inner">
-                {debugLogs.map((l, i) => <div key={i} className="mb-1">{l}</div>)}
+                {debugLogs.map((l, i) => <div key={i} className="mb-1 border-b border-gray-800 pb-1 break-words">{l}</div>)}
             </div>
 
             {initStatus === 'error' && (
@@ -270,7 +290,7 @@ export default function App() {
             <div key={d} onClick={() => { if(inBlock) { setSelectedBlock({id: blockId, date: blockStart, reservation: res}); setIsModalOpen(true); } }} 
                  className={`h-16 border rounded-lg p-1 text-xs relative flex flex-col items-center justify-center transition-all ${color}`}>
                 <span className="font-bold">{d}</span>
-                {res && inBlock && <span className="text-[8px] uppercase font-bold">{res.status}</span>}
+                {res && inBlock && <span className="text-[8px] uppercase font-bold">{String(res.status)}</span>}
             </div>
         );
     }
@@ -307,7 +327,9 @@ export default function App() {
                     <div className="text-center">
                         <h1 className="text-3xl font-black text-red-900">P.U.D. Roteña</h1>
                         <p className="text-sm text-gray-500 font-medium">Gestión de Reservas</p>
-                        <p className="text-xs text-gray-400 mt-2">v3.0 Final</p>
+                        <div className="inline-block mt-2 px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold">
+                            v3.2 (Safe Mode)
+                        </div>
                     </div>
                     <div className="w-full space-y-3">
                         <button onClick={() => setView('calendar')} className="w-full bg-white border-2 border-red-50 p-4 rounded-xl flex items-center gap-4 shadow-sm active:scale-95 transition-transform">
@@ -366,7 +388,7 @@ export default function App() {
             )}
         </main>
 
-        {/* MODAL RESERVA INTEGRADO (Aquí estaba el problema, ahora es código directo, no un componente) */}
+        {/* MODAL RESERVA INTEGRADO (Sin componente, directo en JSX) */}
         {isModalOpen && selectedBlock && (
             <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-fade-in">
                 <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden">
