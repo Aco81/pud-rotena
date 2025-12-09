@@ -7,6 +7,6 @@ export default defineConfig({
   build: {
     sourcemap: true,
   },
-  // Forzamos rutas relativas para evitar el error de importación-
+  // Forzamos rutas relativas para evitar el error de importación
   base: './', 
 })
