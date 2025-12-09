@@ -7,6 +7,5 @@ export default defineConfig({
   build: {
     sourcemap: true,
   },
-  // Forzamos rutas relativas para evitar el error de importación
-  base: './', 
+  // Quitamos 'base' para que Vercel maneje las rutas automáticamente
 })
