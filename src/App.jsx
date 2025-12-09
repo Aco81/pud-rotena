@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-// import { getAnalytics } from "firebase/analytics"; // Desactivado temporalmente para depuración
+// import { getAnalytics } from "firebase/analytics"; 
 import { 
   getAuth, 
   signInAnonymously, 
@@ -39,11 +39,20 @@ import {
   XCircle
 } from 'lucide-react';
 
+// --- SISTEMA DE LOGS DE INICIO (DEBUG) ---
+// Esto nos permitirá ver en la pantalla del móvil qué está fallando
+let initLogs = [];
+function addLog(msg) {
+  console.log(`[PUD Debug] ${msg}`);
+  initLogs.push(msg);
+}
+
 // --- CONFIGURACIÓN DE FIREBASE ---
-let app, auth, db;
+let app = null;
+let auth = null;
+let db = null;
 let initialError = null;
 
-// Usamos un ID fijo en producción para asegurar que los datos se guarden siempre en el mismo sitio
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'rotena-public';
 
 const firebaseConfig = {
@@ -57,16 +66,40 @@ const firebaseConfig = {
 };
 
 try {
-  // Inicialización con tu configuración específica
-  console.log("Intentando inicializar Firebase...");
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  addLog("Iniciando script...");
+  
+  if (!firebaseConfig || !firebaseConfig.apiKey) {
+    throw new Error("Falta configuración Firebase");
+  }
+  addLog("Configuración detectada OK");
+
+  // Inicializar App
+  if (!getApps().length) {
+    addLog("Creando nueva instancia Firebase...");
+    app = initializeApp(firebaseConfig);
+  } else {
+    addLog("Usando instancia existente...");
+    app = getApp();
+  }
+  
+  if (!app) throw new Error("App es null tras init");
+  addLog("App inicializada OK");
+
+  // Inicializar Auth
   auth = getAuth(app);
+  if (!auth) throw new Error("Auth es null");
+  addLog("Auth inicializado OK");
+
+  // Inicializar Firestore
   db = getFirestore(app);
-  // analytics = getAnalytics(app); // Comentado para evitar bloqueos por AdBlockers/Entorno
-  console.log("Firebase inicializado correctamente.");
+  if (!db) throw new Error("DB es null");
+  addLog("Firestore inicializado OK");
+
 } catch (e) {
-  console.error("Error CRÍTICO inicializando Firebase:", e);
-  initialError = e.message;
+  const errMsg = e.message || JSON.stringify(e) || "Error desconocido";
+  console.error("Error CRÍTICO:", e);
+  addLog("ERROR FATAL: " + errMsg);
+  initialError = errMsg;
 }
 
 // --- CONSTANTES ---
@@ -827,6 +860,11 @@ export default function App() {
            <p className="text-red-700 bg-red-100 p-3 rounded-lg border border-red-200 font-mono text-sm break-words">{initialError}</p>
            <p className="text-gray-600 text-sm">Por favor, revisa la configuración de Firebase y la consola del navegador.</p>
            <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-red-700 text-white rounded-lg font-bold">Reintentar</button>
+           
+           <div className="mt-4 text-xs text-left bg-gray-100 p-2 rounded max-h-40 overflow-auto border border-gray-300 font-mono">
+               <p className="font-bold border-b pb-1 mb-1">Debug Log:</p>
+               {initLogs.map((l, i) => <div key={i}>{l}</div>)}
+           </div>
         </div>
       </div>
     );
@@ -837,6 +875,12 @@ export default function App() {
        <div className="w-16 h-16 border-4 border-red-200 border-t-red-700 rounded-full animate-spin"></div>
        <p className="text-gray-500 animate-pulse font-medium">Iniciando P.U.D.R...</p>
        <p className="text-xs text-gray-400">Si esto tarda mucho, recarga la página.</p>
+       
+       <div className="mt-6 w-full max-w-xs text-[10px] text-left bg-gray-50 p-2 rounded border border-gray-100 font-mono text-gray-500">
+           <p className="font-bold border-b pb-1 mb-1">Debug Info:</p>
+           {initLogs.map((l, i) => <div key={i}>{l}</div>)}
+           {!initLogs.length && <div>Sin logs de inicio...</div>}
+       </div>
     </div>
   );
 
