@@ -35,29 +35,15 @@ import {
   Trash2,
   Key,
   Save,
-  XCircle,
-  Loader2
+  XCircle
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE FIREBASE ---
-const fallbackConfig = {
-  apiKey: "AIzaSyA1MuetIpVz6ki2_mdhf4J831oMB8pw39A",
-  authDomain: "rotena-519e4.firebaseapp.com",
-  projectId: "rotena-519e4",
-  storageBucket: "rotena-519e4.firebasestorage.app",
-  messagingSenderId: "872970314926",
-  appId: "1:872970314926:web:577fcdc52aa0fb2aa7f93f",
-  measurementId: "G-ZWFN8WCQFN"
-};
-
 let app, auth, db;
-
-// CORRECCIÓN CRÍTICA: Sanitizamos el appId para evitar barras '/' que rompen la ruta de Firebase
-const rawAppId = typeof __app_id !== 'undefined' ? __app_id : 'rotena-app-default';
-const appId = rawAppId.replace(/[^a-zA-Z0-9_-]/g, '_'); 
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 try {
-  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackConfig;
+  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
   
   if (firebaseConfig) {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -76,12 +62,10 @@ const MASTER_ADMIN_PASS = 'test';
 const LOGO_DRIVE_URL = "https://drive.google.com/uc?export=view&id=1hdKsxPzNRXFE-P5vtvokNBPlwVPI4GH5";
 
 // --- UTILIDADES ---
-
 const getBlockStart = (date) => {
   const d = new Date(date);
   const day = d.getDay(); 
   let diff = 0;
-  // Bloque: Jueves a Lunes
   if (day === 4) diff = 0;      // Jueves
   if (day === 5) diff = -1;     // Viernes
   if (day === 6) diff = -2;     // Sábado
@@ -114,24 +98,33 @@ const isDateInBlock = (checkDate, blockStartDateStr) => {
   check.setHours(0,0,0,0);
   const diffTime = check - blockStart;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-  return diffDays >= 0 && diffDays <= 4; // 0=Jue, 1=Vie, 2=Sab, 3=Dom, 4=Lun
+  return diffDays >= 0 && diffDays <= 4; 
 };
 
-// --- COMPONENTE LOGO ---
+// --- COMPONENTE DE LOGO ---
 const UDRLogo = ({ className }) => {
   const [hasError, setHasError] = useState(false);
 
   if (hasError) {
     return (
-      <div className={`${className} flex items-center justify-center relative min-w-[40px] min-h-[40px] overflow-hidden`}>
-        <div className="w-full h-full relative border-2 border-black" style={{
-          background: 'linear-gradient(135deg, #ffffff 50%, #d32f2f 50%)',
-          clipPath: 'polygon(50% 0, 100% 0, 100% 80%, 50% 100%, 0 80%, 0 0)'
+      <div className={`${className} flex items-center justify-center`} style={{position: 'relative', minWidth: '40px', minHeight: '40px'}}>
+        <div style={{
+          width: '100%', height: '100%', 
+          background: 'linear-gradient(135deg, #ffffff 0%, #ffffff 50%, #d32f2f 50%, #d32f2f 100%)',
+          clipPath: 'polygon(50% 0, 100% 0, 100% 70%, 50% 100%, 0 70%, 0 0)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '2px solid black',
+          position: 'relative'
         }}>
-          <div className="absolute top-[40%] left-[-10%] w-[120%] h-[20%] bg-yellow-400 border-y border-black transform -rotate-12 z-10 flex items-center justify-center">
-             <span className="text-[8px] font-black text-black">P.U.D.R.</span>
+          <div style={{
+            position: 'absolute', width: '120%', height: '25%', background: '#FFD700',
+            top: '45%', left: '-10%', transform: 'rotate(-20deg)',
+            borderTop: '1px solid black', borderBottom: '1px solid black',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10
+          }}>
+             <span style={{fontSize: '10px', fontWeight: '900', color: 'black'}}>P.U.D.R.</span>
           </div>
-          <div className="absolute top-0 left-0 w-1/2 h-full bg-green-700/20"></div>
+          <div style={{position: 'absolute', top: 0, left: 0, width: '50%', height: '50%', background: '#008000', opacity: 0.3}}></div>
         </div>
       </div>
     );
@@ -150,8 +143,18 @@ const UDRLogo = ({ className }) => {
   );
 };
 
-// --- MODAL RESERVA ---
-const Modal = ({ isOpen, onClose, selectedBlock, formData, setFormData, onReservation, isAdminLoggedIn, onConfirmPayment, onCancelReservation }) => {
+// --- MODAL DE RESERVA ---
+const Modal = ({ 
+  isOpen, 
+  onClose, 
+  selectedBlock, 
+  formData, 
+  setFormData, 
+  onReservation, 
+  isAdminLoggedIn,
+  onConfirmPayment, 
+  onCancelReservation 
+}) => {
   if (!isOpen || !selectedBlock) return null;
   
   const res = selectedBlock.reservation;
@@ -165,59 +168,81 @@ const Modal = ({ isOpen, onClose, selectedBlock, formData, setFormData, onReserv
   blockEndDate.setDate(blockEndDate.getDate() + 4); 
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:rounded-xl shadow-2xl sm:max-w-md overflow-hidden max-h-[90vh] flex flex-col rounded-t-2xl animate-in slide-in-from-bottom duration-300">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
+      <div className="bg-white w-full sm:rounded-xl shadow-2xl sm:max-w-md overflow-hidden max-h-[90vh] flex flex-col rounded-t-2xl animate-slide-up sm:animate-none">
         <div className="bg-red-900 p-4 flex justify-between items-center text-white shrink-0">
-          <h3 className="font-bold text-lg">{res ? 'Detalle Reserva' : 'Nueva Reserva'}</h3>
+          <h3 className="font-bold text-lg">
+            {res ? 'Detalle Reserva' : 'Nueva Reserva'}
+          </h3>
           <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors"><X size={24} /></button>
         </div>
         
         <div className="p-6 space-y-5 overflow-y-auto">
-          <div className="text-center mb-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
-            <p className="text-gray-500 text-xs uppercase font-bold tracking-wider mb-1">Fin de Semana Seleccionado</p>
-            <p className="text-xl font-bold text-gray-800">
+          <div className="text-center mb-2">
+            <p className="text-gray-500 text-xs uppercase font-bold tracking-wider">Fin de Semana</p>
+            <p className="text-xl font-bold text-gray-800 mt-1">
               {formatDisplayDate(selectedBlock.date)} - {formatDisplayDate(blockEndDate)}
             </p>
           </div>
 
           {!res && (
             <form onSubmit={onReservation} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre</label>
-                    <input required type="text" className="w-full border border-gray-300 rounded-lg p-3 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                    value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Apellidos</label>
-                    <input required type="text" className="w-full border border-gray-300 rounded-lg p-3 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                    value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input 
+                  required 
+                  type="text" 
+                  className="w-full border border-gray-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                  value={formData.firstName}
+                  onChange={e => setFormData({...formData, firstName: e.target.value})}
+                  placeholder="Nombre del titular"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
+                <input 
+                  required 
+                  type="text" 
+                  className="w-full border border-gray-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                  value={formData.lastName}
+                  onChange={e => setFormData({...formData, lastName: e.target.value})}
+                  placeholder="Apellidos"
+                />
               </div>
               
-              <label className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg border border-gray-200 cursor-pointer">
-                <input type="checkbox" className="w-5 h-5 text-red-600 rounded focus:ring-red-500"
-                  checked={formData.isMember} onChange={e => setFormData({...formData, isMember: e.target.checked})} />
-                <span className="text-gray-800 font-bold flex-1">¿Es Socio de la Peña?</span>
-              </label>
+              <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg border border-gray-100 active:bg-gray-100 transition-colors">
+                <input 
+                  type="checkbox" 
+                  id="isMember"
+                  className="w-6 h-6 text-red-600 rounded focus:ring-red-500 border-gray-300"
+                  checked={formData.isMember}
+                  onChange={e => setFormData({...formData, isMember: e.target.checked})}
+                />
+                <label htmlFor="isMember" className="text-gray-800 font-medium flex-1">¿Es Socio?</label>
+              </div>
 
               {formData.isMember && (
-                 <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Número de Socio</label>
-                   <input type="number" className="w-full border border-gray-300 rounded-lg p-3 outline-none focus:border-red-500"
-                     value={formData.memberNumber} onChange={e => setFormData({...formData, memberNumber: e.target.value})} placeholder="Opcional" />
+                 <div className="animate-fade-in">
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Número de Socio (Opcional)</label>
+                   <input 
+                     type="number" 
+                     className="w-full border border-gray-300 rounded-lg p-3 text-base focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                     value={formData.memberNumber}
+                     onChange={e => setFormData({...formData, memberNumber: e.target.value})}
+                     placeholder="Ej: 1234"
+                   />
                  </div>
               )}
 
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg">
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-bold text-yellow-800">Precio Total</span>
-                    <span className="text-xl font-black text-yellow-900">{formData.isMember ? '100€' : '300€'}</span>
-                </div>
-                <p className="text-xs text-yellow-700">El pago debe realizarse en un plazo máximo de 5 días.</p>
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-sm text-yellow-900 rounded-r-lg shadow-sm">
+                <p className="font-bold flex items-center gap-2 text-lg"><Euro size={20}/> {formData.isMember ? '100,00€' : '300,00€'}</p>
+                <p className="mt-1 opacity-90">Si no se realiza el pago en 5 días, la fecha quedará libre automáticamente.</p>
               </div>
 
-              <button type="submit" className="w-full bg-red-700 hover:bg-red-800 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all">
+              <button 
+                type="submit" 
+                className="w-full bg-red-700 hover:bg-red-800 active:scale-[0.98] text-white font-bold py-4 rounded-xl shadow-lg transition-all text-lg mt-2"
+              >
                 Confirmar Reserva
               </button>
             </form>
@@ -225,32 +250,51 @@ const Modal = ({ isOpen, onClose, selectedBlock, formData, setFormData, onReserv
 
           {res && (
             <div className="space-y-4">
-               <div className={`p-4 rounded-xl border-l-4 ${res.status === 'confirmed' ? 'bg-green-50 border-green-500' : 'bg-orange-50 border-orange-500'}`}>
+               <div className={`p-4 rounded-xl border-l-4 shadow-sm ${res.status === 'confirmed' ? 'bg-green-50 border-green-500' : 'bg-orange-50 border-orange-500'}`}>
                   <div className="flex items-center gap-2 mb-2">
-                      {res.status === 'confirmed' ? <Check className="text-green-600" size={20}/> : <Clock className="text-orange-600" size={20}/>}
-                      <span className={`font-bold uppercase text-sm ${res.status === 'confirmed' ? 'text-green-800' : 'text-orange-800'}`}>
-                        {res.status === 'confirmed' ? 'Reserva Confirmada' : 'Pendiente de Pago'}
-                      </span>
+                      {res.status === 'confirmed' ? <Check className="text-green-600" size={24}/> : <Clock className="text-orange-600" size={24}/>}
+                      <span className="font-bold uppercase text-base">{res.status === 'confirmed' ? 'Pagado / Confirmado' : 'Pendiente de Pago'}</span>
                   </div>
-                  {res.status === 'pending' && <p className="text-xs text-orange-800 font-medium pl-7">Caduca en: <strong>{daysLeft} días</strong></p>}
+                  {res.status === 'pending' && (
+                      <p className="text-sm text-orange-800 font-medium pl-8">
+                         Caduca en: <span className="font-bold text-lg">{daysLeft}</span> días
+                      </p>
+                  )}
                </div>
 
-               <div className="bg-gray-50 p-4 rounded-xl space-y-2 border border-gray-100 text-sm">
-                  <div className="flex justify-between"><span className="text-gray-500">Titular:</span> <span className="font-semibold">{res.firstName} {res.lastName}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">Tipo:</span> <span className="font-semibold">{res.isMember ? `Socio ${res.memberNumber ? `(#${res.memberNumber})` : ''}` : 'No Socio'}</span></div>
-                  <div className="flex justify-between border-t pt-2 mt-2"><span className="text-gray-500">Importe:</span> <span className="font-bold text-red-700">{res.price}€</span></div>
+               <div className="bg-gray-50 p-5 rounded-xl space-y-3 border border-gray-100">
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-gray-500">Titular</span>
+                    <span className="font-semibold text-right">{res.firstName} {res.lastName}</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-gray-500">Tipo</span>
+                    <span className="font-semibold text-right">{res.isMember ? `Socio ${res.memberNumber ? `(#${res.memberNumber})` : ''}` : 'No Socio'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Importe</span>
+                    <span className="font-bold text-red-700 text-lg text-right">{res.price.toFixed(2)}€</span>
+                  </div>
                </div>
 
                {isAdminLoggedIn && (
-                  <div className="pt-4 border-t space-y-3">
-                      <p className="text-xs font-bold text-gray-400 uppercase text-center">Zona Administración</p>
+                  <div className="space-y-3 pt-4 border-t">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest text-center mb-2">Zona Admin</p>
+                      
                       {res.status === 'pending' && (
-                          <button onClick={onConfirmPayment} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg flex justify-center gap-2 font-bold text-sm shadow-md">
-                              <Check size={18}/> Confirmar Pago Recibido
+                          <button 
+                              onClick={onConfirmPayment}
+                              className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg flex justify-center items-center gap-2 font-semibold shadow-md active:scale-95 transition-transform"
+                          >
+                              <Check size={20}/> Confirmar Pago
                           </button>
                       )}
-                      <button onClick={onCancelReservation} className="w-full bg-white border border-red-200 text-red-600 hover:bg-red-50 py-3 rounded-lg flex justify-center gap-2 font-bold text-sm">
-                        <Trash2 size={18}/> Eliminar Reserva
+
+                      <button 
+                          onClick={onCancelReservation}
+                          className="w-full bg-white border-2 border-red-100 text-red-600 hover:bg-red-50 py-3 rounded-lg flex justify-center items-center gap-2 font-semibold active:scale-95 transition-transform"
+                      >
+                        <Trash2 size={20}/> Cancelar Reserva
                       </button>
                   </div>
                )}
@@ -262,75 +306,165 @@ const Modal = ({ isOpen, onClose, selectedBlock, formData, setFormData, onReserv
   );
 };
 
-// --- PANEL ADMIN ---
-const AdminPanel = ({ admins, onExit, onAddAdmin, onDeleteAdmin, onUpdateAdminPass, newAdminData, setNewAdminData, currentAdminId }) => {
+// --- PANEL DE ADMINISTRACIÓN ---
+const AdminPanel = ({ 
+  admins, 
+  onExit, 
+  onAddAdmin, 
+  onDeleteAdmin,
+  onUpdateAdminPass,
+  newAdminData, 
+  setNewAdminData,
+  currentAdminId
+}) => {
   const isMaster = currentAdminId === MASTER_ADMIN_ID;
   const [editingId, setEditingId] = useState(null);
   const [editPassValue, setEditPassValue] = useState("");
 
+  const startEditing = (admin) => {
+    setEditingId(admin.id);
+    setEditPassValue(admin.password);
+  };
+
+  const saveEditing = (adminId) => {
+    onUpdateAdminPass(adminId, editPassValue);
+    setEditingId(null);
+    setEditPassValue("");
+  };
+
   return (
-    <div className="p-4 space-y-6 pb-20">
-       <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm sticky top-0 z-10 border-b">
-         <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Lock size={20}/> Panel Directiva</h2>
-         <button onClick={onExit} className="text-red-700 font-bold text-xs bg-red-50 px-3 py-2 rounded-full">Salir</button>
+    <div className="p-4 space-y-6 pb-20 animate-fade-in">
+       <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm sticky top-20 z-10">
+         <h2 className="text-lg font-bold text-gray-800">Panel Admin</h2>
+         <button onClick={onExit} className="text-red-700 font-medium text-sm flex items-center gap-1 bg-red-50 px-3 py-1.5 rounded-full"><LogOut size={14}/> Salir</button>
        </div>
        
        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-          <div className="mb-6 flex items-center gap-3 text-sm bg-gray-50 p-3 rounded-lg">
-             <div className="bg-green-100 text-green-700 p-2 rounded-full"><User size={16}/></div>
-             <div><p className="text-xs text-gray-500 uppercase font-bold">Sesión iniciada como</p><p className="font-bold">{currentAdminId === MASTER_ADMIN_ID ? 'Administrador Principal' : `Socio ${currentAdminId}`}</p></div>
+          <div className="flex items-center gap-3 mb-5 text-red-900 bg-red-50 p-3 rounded-lg">
+             <div className="bg-white p-2 rounded-full shadow-sm"><User size={20}/></div>
+             <div>
+                <span className="text-xs text-red-600 font-bold uppercase block">Sesión Actual</span>
+                <span className="font-bold">{currentAdminId === MASTER_ADMIN_ID ? 'Admin Principal (123)' : `Colaborador (${currentAdminId})`}</span>
+             </div>
           </div>
 
           {isMaster ? (
              <>
-                <div className="space-y-3 bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <p className="text-xs text-blue-800 font-bold uppercase mb-2">Añadir nuevo acceso</p>
-                  <div className="flex gap-2">
-                    <input type="number" placeholder="Nº Socio" className="w-1/3 p-2 rounded border text-sm" value={newAdminData.id} onChange={(e) => setNewAdminData({...newAdminData, id: e.target.value})} />
-                    <input type="text" placeholder="Contraseña" className="flex-1 p-2 rounded border text-sm" value={newAdminData.pass} onChange={(e) => setNewAdminData({...newAdminData, pass: e.target.value})} />
+                <h3 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide border-b pb-2">Gestión de Administradores</h3>
+                <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <p className="text-xs text-gray-500 font-semibold uppercase">Añadir nuevo colaborador</p>
+                  <div className="flex flex-col gap-3">
+                    <input 
+                        type="number" 
+                        placeholder="Nº Socio (Login)" 
+                        className="border border-gray-300 p-3 rounded-lg text-base outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        value={newAdminData.id}
+                        onChange={(e) => setNewAdminData({...newAdminData, id: e.target.value})}
+                    />
+                    <input 
+                        type="text" 
+                        placeholder="Contraseña" 
+                        className="border border-gray-300 p-3 rounded-lg text-base outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                        value={newAdminData.pass}
+                        onChange={(e) => setNewAdminData({...newAdminData, pass: e.target.value})}
+                    />
                   </div>
-                  <button onClick={onAddAdmin} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-sm shadow-sm hover:bg-blue-700">Crear Acceso</button>
+                  <button 
+                    onClick={onAddAdmin} 
+                    className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-black font-bold text-sm flex justify-center items-center gap-2 active:scale-[0.98] transition-transform"
+                  >
+                    <User size={18}/> Crear Administrador
+                  </button>
                 </div>
 
                 <div className="mt-6">
-                  <p className="text-sm font-bold text-gray-700 mb-3 border-b pb-2">Accesos Activos</p>
-                  <ul className="space-y-2">
+                  <p className="text-sm font-bold text-gray-700 mb-3">Listado de Administradores</p>
+                  <ul className="space-y-3">
+                      <li className="bg-gradient-to-r from-red-50 to-white border border-red-100 p-3 rounded-lg flex justify-between items-center shadow-sm">
+                        <span className="font-bold text-red-900 text-sm flex items-center gap-2"><Lock size={14}/> Master (123)</span>
+                        <span className="text-[10px] uppercase font-bold bg-red-200 text-red-900 px-2 py-1 rounded-full">Principal</span>
+                      </li>
                       {admins.map(a => (
-                          <li key={a.id} className="bg-white border p-3 rounded-lg flex justify-between items-center text-sm">
-                            <span className="font-mono font-bold text-gray-600">Socio {a.memberId}</span>
-                            <div className="flex gap-2 items-center">
-                                {editingId === a.id ? (
-                                    <div className="flex gap-1">
-                                      <input type="text" value={editPassValue} onChange={(e)=>setEditPassValue(e.target.value)} className="w-20 border rounded px-1 text-xs" />
-                                      <button onClick={()=>{onUpdateAdminPass(a.id, editPassValue); setEditingId(null)}}><Save size={16} className="text-green-600"/></button>
-                                      <button onClick={()=>setEditingId(null)}><XCircle size={16} className="text-gray-400"/></button>
-                                    </div>
-                                ) : (
-                                    <>
-                                      <span className="text-xs text-gray-400 mr-2">Pass: {a.password}</span>
-                                      <button onClick={()=>{setEditingId(a.id); setEditPassValue(a.password)}}><Key size={16} className="text-blue-500"/></button>
-                                      <button onClick={()=>onDeleteAdmin(a.id)}><Trash2 size={16} className="text-red-500"/></button>
-                                    </>
-                                )}
+                          <li key={a.id} className="bg-white border border-gray-200 p-3 rounded-lg flex flex-col gap-3 shadow-sm">
+                            <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                                <span className="font-mono font-bold text-sm flex items-center gap-2 text-gray-700">
+                                  <User size={16} className="text-gray-400"/> Socio {a.memberId}
+                                </span>
+                                <div className="flex gap-1">
+                                    {editingId === a.id ? (
+                                      <>
+                                        <button 
+                                            onClick={() => saveEditing(a.id)}
+                                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg bg-green-100 transition-colors"
+                                        >
+                                            <Save size={18}/>
+                                        </button>
+                                        <button 
+                                            onClick={() => setEditingId(null)}
+                                            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                                        >
+                                            <XCircle size={18}/>
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button 
+                                            onClick={() => startEditing(a)}
+                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        >
+                                            <Key size={18}/>
+                                        </button>
+                                        <button 
+                                            onClick={() => onDeleteAdmin(a.id)}
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 size={18}/>
+                                        </button>
+                                      </>
+                                    )}
+                                </div>
                             </div>
+                            
+                            {editingId === a.id ? (
+                              <div className="flex items-center gap-2 bg-gray-50 p-2 rounded">
+                                <span className="text-xs text-gray-500 font-bold whitespace-nowrap">Nueva pass:</span>
+                                <input 
+                                  type="text" 
+                                  value={editPassValue} 
+                                  onChange={(e) => setEditPassValue(e.target.value)}
+                                  className="border rounded px-2 py-1 text-sm w-full outline-none focus:border-blue-500"
+                                  autoFocus
+                                />
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400 font-mono pl-6">Pass: {a.password}</div>
+                            )}
                           </li>
                       ))}
-                      {admins.length === 0 && <p className="text-xs text-gray-400 italic">No hay otros administradores.</p>}
+                      {admins.length === 0 && <p className="text-sm text-gray-400 italic text-center py-4 bg-gray-50 rounded-lg">No hay colaboradores añadidos.</p>}
                   </ul>
                 </div>
              </>
           ) : (
-             <div className="text-center py-8 text-gray-400">
-                <Shield size={40} className="mx-auto mb-2 opacity-20"/>
-                <p className="text-sm">Tu nivel de acceso es limitado.</p>
+             <div className="p-6 bg-gray-50 rounded-xl text-center text-gray-500 text-sm flex flex-col items-center gap-2">
+                <Shield size={32} className="text-gray-300"/>
+                <p>Tu nivel de acceso no permite gestionar usuarios.</p>
              </div>
           )}
+       </div>
+
+       <div className="bg-blue-50 p-5 rounded-xl text-sm text-blue-900 border border-blue-100">
+          <p className="font-bold flex items-center gap-2 mb-2"><Info size={18}/> Acciones Rápidas</p>
+          <ul className="space-y-2 pl-2">
+            <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div> <span>Pulsar en una reserva <strong>Naranja</strong> para confirmar pago.</span></li>
+            <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div> <span>Pulsar en cualquier reserva para <strong>cancelarla</strong>.</span></li>
+          </ul>
        </div>
     </div>
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
+// --- COMPONENTE PRINCIPAL (APP) ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [reservations, setReservations] = useState([]);
@@ -342,7 +476,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [view, setView] = useState('landing'); 
-  const [slideDirection, setSlideDirection] = useState('right');
+  const [slideDirection, setSlideDirection] = useState(''); 
   
   // Admin State
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -350,7 +484,45 @@ export default function App() {
   const [adminUser, setAdminUser] = useState({ id: '', pass: '' });
   const [newAdminData, setNewAdminData] = useState({ id: '', pass: '' });
 
-  // Form State
+  // Swipe handlers
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const changeMonth = (direction) => {
+      setSlideDirection(direction === 'next' ? 'left' : 'right');
+      const newDate = new Date(currentDate);
+      if (direction === 'next') {
+        newDate.setMonth(newDate.getMonth() + 1);
+      } else {
+        newDate.setMonth(newDate.getMonth() - 1);
+      }
+      setTimeout(() => setCurrentDate(newDate), 0);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      changeMonth('next');
+    }
+    if (isRightSwipe) {
+      changeMonth('prev');
+    }
+  };
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -358,293 +530,537 @@ export default function App() {
     memberNumber: ''
   });
 
-  // Swipe logic
-  const [touchStart, setTouchStart] = useState(null);
-  const [touchEnd, setTouchEnd] = useState(null);
-
-  const onTouchStart = (e) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-  const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    if (distance > 50) changeMonth('next');
-    if (distance < -50) changeMonth('prev');
-  };
-
-  const changeMonth = (direction) => {
-      setSlideDirection(direction === 'next' ? 'left' : 'right');
-      const newDate = new Date(currentDate);
-      newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
-      setCurrentDate(newDate);
-  };
-
-  // Auth & Sync
+  // --- AUTH & DATA SYNC ---
   useEffect(() => {
     if (!auth) return;
-    const init = async () => {
+    const initAuth = async () => {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
             await signInWithCustomToken(auth, __initial_auth_token);
         } else {
             await signInAnonymously(auth);
         }
     };
-    init();
-    return onAuthStateChanged(auth, setUser);
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!user || !db) return;
     
-    // CORRECCIÓN: Manejo de errores en onSnapshot
-    const reservationsQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'reservations'));
-    const unsubRes = onSnapshot(reservationsQuery, (snap) => {
+    const qRes = query(collection(db, 'artifacts', appId, 'public', 'data', 'reservations'));
+    const unsubRes = onSnapshot(qRes, (snapshot) => {
       const resData = [];
       const now = new Date();
-      snap.forEach((d) => {
-        const data = d.data();
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        let isExpired = false;
         if (data.status === 'pending' && data.createdAt) {
-          if ((now - data.createdAt.toDate()) / (86400000) > 5) {
-             deleteDoc(d.ref); 
-             return;
+          const created = data.createdAt.toDate();
+          const diffDays = (now - created) / (1000 * 60 * 60 * 24);
+          if (diffDays > 5) {
+            isExpired = true;
+            deleteDoc(docSnap.ref);
           }
         }
-        resData.push({ id: d.id, ...data });
+        if (!isExpired) resData.push({ id: docSnap.id, ...data });
       });
       setReservations(resData);
-    }, (error) => {
-        console.error("Error cargando reservas:", error);
     });
 
-    const adminsQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'admins'));
-    const unsubAdmins = onSnapshot(adminsQuery, (snap) => {
+    const qAdmins = query(collection(db, 'artifacts', appId, 'public', 'data', 'admins'));
+    const unsubAdmins = onSnapshot(qAdmins, (snapshot) => {
       const adData = [];
-      snap.forEach(d => adData.push({ id: d.id, ...d.data() }));
+      snapshot.forEach(doc => adData.push({ id: doc.id, ...doc.data() }));
       setAdmins(adData);
-    }, (error) => {
-        console.error("Error cargando admins:", error);
     });
 
-    return () => { unsubRes(); unsubAdmins(); };
+    return () => {
+      unsubRes();
+      unsubAdmins();
+    };
   }, [user]);
 
-  // Handlers
+  // --- HANDLERS ---
   const handleDayClick = (day) => {
     const blockStart = getBlockStart(day);
     const blockId = formatDateId(blockStart);
     const existing = reservations.find(r => r.id === blockId);
-    setSelectedBlock({ id: blockId, date: blockStart, reservation: existing || null });
+    
+    setSelectedBlock({
+      id: blockId,
+      date: blockStart,
+      reservation: existing || null
+    });
     setIsModalOpen(true);
   };
 
   const handleLogin = (e) => {
     e.preventDefault();
     if (adminUser.id === MASTER_ADMIN_ID && adminUser.pass === MASTER_ADMIN_PASS) {
-      setIsAdminLoggedIn(true); setCurrentAdminId(MASTER_ADMIN_ID); setView('adminPanel'); return;
+      setIsAdminLoggedIn(true);
+      setCurrentAdminId(MASTER_ADMIN_ID);
+      setView('adminPanel');
+      return;
     }
-    const subAdmin = admins.find(a => a.memberId === adminUser.id && a.password === adminUser.pass);
-    if (subAdmin) {
-       setIsAdminLoggedIn(true); setCurrentAdminId(subAdmin.memberId); setView('adminPanel');
-    } else {
-       alert('Credenciales incorrectas');
+    const validSubAdmin = admins.find(a => a.memberId === adminUser.id && a.password === adminUser.pass);
+    if (validSubAdmin) {
+       setIsAdminLoggedIn(true);
+       setCurrentAdminId(validSubAdmin.memberId);
+       setView('adminPanel');
+       return;
     }
+    console.log('Credenciales incorrectas');
+  };
+
+  const handleAddAdmin = async () => {
+    if (!newAdminData.id || !newAdminData.pass) return;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admins', newAdminData.id), {
+        memberId: newAdminData.id,
+        password: newAdminData.pass,
+        addedBy: currentAdminId,
+        createdAt: serverTimestamp()
+      });
+      setNewAdminData({ id: '', pass: '' });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteAdmin = async (id) => {
+      try {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admins', id));
+      } catch(e) { console.error(e); }
+  };
+
+  const handleUpdateAdminPass = async (id, newPass) => {
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admins', id), {
+              password: newPass
+          });
+      } catch(e) { console.error(e); }
   };
 
   const handleReservation = async (e) => {
     e.preventDefault();
     if (!selectedBlock) return;
     const price = formData.isMember ? 100 : 300;
+    
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reservations', selectedBlock.id), {
-        startDate: selectedBlock.id, status: 'pending', 
-        firstName: formData.firstName, lastName: formData.lastName,
-        isMember: formData.isMember, memberNumber: formData.memberNumber || null,
-        price, createdAt: serverTimestamp()
+        startDate: selectedBlock.id,
+        status: 'pending', 
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        isMember: formData.isMember,
+        memberNumber: formData.memberNumber || null,
+        price: price,
+        createdAt: serverTimestamp()
       });
+      
       setIsModalOpen(false);
       setFormData({ firstName: '', lastName: '', isMember: false, memberNumber: '' });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleAdminActions = async (action, payload) => {
-      try {
-        if (action === 'addAdmin') await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admins', payload.id), { memberId: payload.id, password: payload.pass });
-        if (action === 'deleteAdmin') await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admins', payload));
-        if (action === 'updatePass') await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admins', payload.id), { password: payload.newPass });
-        if (action === 'confirmPay') { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reservations', selectedBlock.id), { status: 'confirmed' }); setIsModalOpen(false); }
-        if (action === 'cancelRes') { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reservations', selectedBlock.id)); setIsModalOpen(false); }
-      } catch(e) { console.error(e); }
+  const handleConfirmPayment = async () => {
+    if (!selectedBlock?.reservation) return;
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reservations', selectedBlock.id), {
+        status: 'confirmed'
+      });
+      setIsModalOpen(false);
+    } catch (e) {}
+  };
+
+  const handleCancelReservation = async () => {
+    if (!selectedBlock?.reservation) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reservations', selectedBlock.id));
+      setIsModalOpen(false);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleLogout = () => {
+    setIsAdminLoggedIn(false);
+    setCurrentAdminId('');
+    setIsMenuOpen(false);
+    setAdminUser({id:'', pass:''});
+    setView('landing');
   };
 
   const renderCalendar = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const firstDay = new Date(year, month, 1);
+    const startingDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const startDayOfWeek = (firstDay.getDay() + 6) % 7; // Lunes=0
     
     const days = [];
-    for (let i = 0; i < startDayOfWeek; i++) {
-      days.push(<div key={`empty-${i}`} className="h-20 sm:h-24 bg-gray-50/30"></div>);
+    
+    // Espacios vacíos
+    for (let i = 0; i < startingDay; i++) {
+      days.push(<div key={`empty-${i}`} className="min-h-[4rem] bg-gray-50/50 rounded-xl"></div>);
     }
     
+    // Días del mes
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d);
-      const activeRes = reservations.find(r => isDateInBlock(date, r.startDate));
+      const blockStart = getBlockStart(date);
+      const blockId = formatDateId(blockStart);
+      const reservation = reservations.find(r => r.id === blockId);
       
-      let statusClass = 'bg-white border-gray-100 hover:border-red-300';
-      if (activeRes) {
-          statusClass = activeRes.status === 'confirmed' 
-            ? 'bg-red-50 border-red-200' 
-            : 'bg-orange-50 border-orange-200';
+      const isToday = new Date().toDateString() === date.toDateString();
+      const isPast = date < new Date().setHours(0,0,0,0);
+      const inBlock = isDateInBlock(date, blockId);
+      
+      let statusColor = 'bg-white';
+      let statusBorder = 'border-gray-200';
+      let statusText = 'text-gray-700';
+      
+      // Lógica de visualización:
+      // Si el bloque (Jue-Lun) tiene reserva, pintamos los días correspondientes (inBlock)
+      if (reservation && inBlock) {
+        if (reservation.status === 'confirmed') {
+          statusColor = 'bg-red-50';
+          statusBorder = 'border-red-500';
+          statusText = 'text-red-700';
+        } else {
+          statusColor = 'bg-orange-50';
+          statusBorder = 'border-orange-400';
+          statusText = 'text-orange-700';
+        }
+      } else if (inBlock) {
+         // Si es día de bloque (Jue-Lun) pero no hay reserva, es libre.
+         statusColor = 'bg-white hover:bg-green-50';
+         statusBorder = 'border-green-200'; 
       }
 
+      // Si no es un día de bloque (ej. Mar/Mie fuera de festivo), lo dejamos gris/neutro
+      // Pero el usuario puede hacer click en CUALQUIER día para ver el bloque asociado.
+      
       days.push(
-        <button 
-            key={d} 
-            onClick={() => handleDayClick(date)}
-            className={`h-20 sm:h-24 p-1 flex flex-col justify-between border rounded-xl transition-all relative overflow-hidden ${statusClass}`}
+        <div 
+          key={d}
+          onClick={() => handleDayClick(date)}
+          className={`
+            relative min-h-[4rem] p-1 rounded-xl border flex flex-col justify-between transition-all cursor-pointer shadow-sm
+            ${statusColor} ${statusBorder} ${isPast ? 'opacity-50 grayscale' : 'hover:scale-[1.02] active:scale-95'}
+            ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
+          `}
         >
-            <span className={`text-sm font-bold ml-1 mt-1 ${activeRes ? 'text-gray-500' : 'text-gray-800'}`}>{d}</span>
-            {activeRes && (
-                <div className={`w-full text-[9px] font-bold px-1.5 py-1 rounded-md truncate ${activeRes.status === 'confirmed' ? 'bg-red-100 text-red-900' : 'bg-orange-100 text-orange-900'}`}>
-                    {activeRes.status === 'confirmed' ? 'OCUPADO' : 'RESERVADO'}
-                </div>
-            )}
-            {!activeRes && date.getDay() === 4 && ( // Marca visual para Jueves (Inicio de Bloque)
-                <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-400 rounded-full"></div>
-            )}
-        </button>
+          <span className={`text-xs font-bold ml-1 mt-1 ${isToday ? 'bg-blue-600 text-white w-5 h-5 flex items-center justify-center rounded-full' : 'text-gray-500'}`}>
+            {d}
+          </span>
+          
+          {reservation && inBlock && (
+            <div className={`text-[9px] font-bold leading-tight p-0.5 rounded bg-white/60 truncate ${statusText}`}>
+               {reservation.status === 'confirmed' ? 'OCUPADO' : 'RESERVADO'}
+            </div>
+          )}
+          
+          {!reservation && inBlock && !isPast && (
+             <div className="flex justify-end p-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
+             </div>
+          )}
+        </div>
       );
     }
-    
+
+    const animationClass = slideDirection === 'left' ? 'animate-slide-in-right' : slideDirection === 'right' ? 'animate-slide-in-left' : 'animate-fade-in';
+
     return (
-        <div 
-            className="grid grid-cols-7 gap-2 select-none"
-            onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        >
-            {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => (
-                <div key={d} className="text-center text-xs font-black text-gray-400 py-2">{d}</div>
-            ))}
-            {days}
-        </div>
+      <div 
+        key={currentDate.toISOString()}
+        className={`grid grid-cols-7 gap-1.5 sm:gap-2 ${animationClass}`}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
+          <div key={day} className="text-center text-xs font-bold text-gray-400 py-2">
+            {day}
+          </div>
+        ))}
+        {days}
+      </div>
     );
   };
 
-  if (!app) return <div className="h-screen flex items-center justify-center flex-col gap-4 bg-slate-50"><Loader2 className="animate-spin text-red-700" size={40}/><p className="text-gray-400 text-sm font-medium">Conectando con la Peña...</p></div>;
+  if (!app) return <div className="p-10 text-center text-gray-500 animate-pulse">Iniciando P.U.D.R...</div>;
 
   return (
-    <div className="min-h-screen bg-white font-sans text-gray-900">
-      {/* Header fijo solo si no estamos en landing */}
+    <div className="min-h-screen bg-gray-50 font-sans pb-10">
+      <style>{`
+        @keyframes slideInRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideInLeft { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
+        .animate-slide-in-left { animation: slideInLeft 0.3s ease-out forwards; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}</style>
+      
       {view !== 'landing' && (
-        <header className="bg-white p-4 sticky top-0 z-40 border-b border-gray-100 shadow-sm flex justify-between items-center">
-            <div className="flex items-center gap-3" onClick={() => setView('calendar')}>
-               <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 shadow-sm p-0.5"><UDRLogo className="w-full h-full object-contain"/></div>
-               <div><h1 className="font-black text-sm text-red-900 leading-none">PEÑA UNIÓN</h1><p className="text-[9px] font-bold text-yellow-600 tracking-widest">DEPORTIVA ROTEÑA</p></div>
+        <header className="bg-white text-gray-800 p-4 shadow-sm sticky top-0 z-40 border-b border-gray-200">
+          <div className="flex justify-between items-center max-w-4xl mx-auto">
+            <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setView('calendar')}>
+               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center p-0.5 overflow-hidden shadow-md border border-gray-100">
+                  <UDRLogo className="w-full h-full object-contain" />
+               </div>
+               <div className="leading-none">
+                 <h1 className="font-extrabold text-base text-red-900">Peña Unión</h1>
+                 <h2 className="text-[10px] text-yellow-600 font-bold tracking-widest uppercase">Deportiva Roteña</h2>
+               </div>
             </div>
-            <button onClick={() => setIsMenuOpen(true)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100"><Menu size={20}/></button>
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+              <Menu size={20} className="text-gray-700"/>
+            </button>
+          </div>
         </header>
       )}
 
-      {/* Menú Lateral */}
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-in fade-in" onClick={() => setIsMenuOpen(false)}>
-            <div className="absolute right-0 top-0 h-full w-[80%] max-w-sm bg-white shadow-2xl p-6 flex flex-col animate-in slide-in-from-right" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-8 pb-4 border-b"><span className="font-bold text-lg">Menú</span><button onClick={() => setIsMenuOpen(false)}><X size={24}/></button></div>
-                <nav className="space-y-2 flex-1">
-                    <button onClick={() => {setView('calendar'); setIsMenuOpen(false);}} className="w-full text-left p-4 hover:bg-red-50 rounded-xl flex items-center gap-3 font-bold text-gray-700"><CalendarIcon size={20}/> Calendario</button>
-                    <button onClick={() => {setView('rules'); setIsMenuOpen(false);}} className="w-full text-left p-4 hover:bg-red-50 rounded-xl flex items-center gap-3 font-bold text-gray-700"><Shield size={20}/> Normativa</button>
-                    {isAdminLoggedIn && <button onClick={() => {setView('adminPanel'); setIsMenuOpen(false);}} className="w-full text-left p-4 bg-gray-900 text-white rounded-xl flex items-center gap-3 font-bold mt-4 shadow-lg"><Lock size={20}/> Panel Directiva</button>}
+      {isMenuOpen && view !== 'landing' && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setIsMenuOpen(false)}>
+            <div className="absolute right-0 top-0 h-full w-[80%] max-w-sm bg-white shadow-2xl p-6 flex flex-col animate-slide-in-right" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-8 border-b pb-4">
+                    <span className="font-bold text-lg text-gray-800">Menú</span>
+                    <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-gray-100 rounded-full"><X size={20}/></button>
+                </div>
+                <nav className="space-y-3 flex-1">
+                    <button onClick={() => {setView('calendar'); setIsMenuOpen(false);}} className="w-full text-left p-4 hover:bg-red-50 rounded-xl flex items-center gap-4 font-bold text-gray-700 transition-colors">
+                        <CalendarIcon size={22} className="text-red-800"/> Calendario
+                    </button>
+                    <button onClick={() => {setView('rules'); setIsMenuOpen(false);}} className="w-full text-left p-4 hover:bg-red-50 rounded-xl flex items-center gap-4 font-bold text-gray-700 transition-colors">
+                        <Shield size={22} className="text-red-800"/> Normativa
+                    </button>
+                    {isAdminLoggedIn && (
+                        <button onClick={() => {setView('adminPanel'); setIsMenuOpen(false);}} className="w-full text-left p-4 bg-red-900 text-white rounded-xl flex items-center gap-4 font-bold shadow-md mt-4">
+                            <Users size={22}/> Panel Admin
+                        </button>
+                    )}
                 </nav>
-                <button onClick={() => {setIsAdminLoggedIn(false); setView('landing'); setIsMenuOpen(false);}} className="w-full p-4 bg-red-50 text-red-700 rounded-xl font-bold flex items-center justify-center gap-2"><LogOut size={18}/> Cerrar Sesión</button>
+                <div className="pt-6 border-t">
+                    <button onClick={handleLogout} className="w-full p-4 text-red-600 bg-red-50 rounded-xl flex items-center justify-center gap-2 font-bold hover:bg-red-100 transition-colors">
+                        <LogOut size={18}/> Cerrar Sesión
+                    </button>
+                </div>
             </div>
         </div>
       )}
 
-      <main className="max-w-md mx-auto min-h-screen">
+      <main className="max-w-4xl mx-auto">
+        
         {view === 'landing' && (
-          <div className="flex flex-col items-center justify-center min-h-screen px-6 animate-in zoom-in-95 duration-500">
-            <div className="mb-12 text-center">
-              <div className="w-32 h-32 mx-auto bg-white rounded-full shadow-2xl p-4 mb-6 border-4 border-yellow-400 ring-4 ring-red-900/10"><UDRLogo className="w-full h-full object-contain"/></div>
-              <h1 className="text-4xl font-black text-red-900 tracking-tight">PEÑA UNIÓN</h1>
-              <h2 className="text-sm font-bold text-yellow-600 tracking-[0.4em] mt-2 border-y border-yellow-200 py-1">DEPORTIVA ROTEÑA</h2>
+          <div className="flex flex-col items-center justify-center min-h-[90vh] px-6 animate-fade-in pb-10">
+            <div className="mb-10 text-center flex flex-col items-center">
+              <div className="w-32 h-32 bg-white rounded-b-[2rem] rounded-t-xl flex items-center justify-center shadow-xl overflow-hidden mb-6 p-2 ring-4 ring-yellow-400/20">
+                  <UDRLogo className="w-full h-full object-contain" />
+              </div>
+              <h1 className="text-4xl font-black text-red-900 uppercase tracking-tight drop-shadow-sm">Peña Unión</h1>
+              <h2 className="text-sm text-yellow-600 font-bold tracking-[0.3em] mt-1 border-t border-b border-yellow-200 py-1 px-4">DEPORTIVA ROTEÑA</h2>
             </div>
-            <div className="w-full space-y-4">
-              <button onClick={() => setView('calendar')} className="w-full bg-red-600 text-white p-5 rounded-2xl shadow-lg shadow-red-200 flex items-center justify-between group active:scale-95 transition-all">
-                <div className="flex items-center gap-4"><div className="bg-red-800/30 p-2 rounded-lg"><User size={24}/></div><div className="text-left"><span className="block font-bold text-lg">Soy Socio</span><span className="text-xs text-red-100">Reservar caseta</span></div></div>
-                <ChevronRight className="opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all"/>
+
+            <div className="w-full max-w-sm space-y-4">
+              <button 
+                onClick={() => setView('calendar')}
+                className="w-full bg-white border border-red-100 hover:border-red-500 hover:bg-red-50 active:bg-red-100 active:scale-[0.98] transition-all p-6 rounded-2xl shadow-lg flex items-center justify-between group relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-red-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
+                <div className="flex items-center gap-5 relative z-10">
+                  <div className="p-4 bg-red-100 rounded-2xl text-red-700 group-hover:bg-red-600 group-hover:text-white transition-colors shadow-sm">
+                    <User size={28} />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-bold text-xl text-gray-800">Soy Socio</h3>
+                    <p className="text-xs text-gray-500 font-medium mt-0.5">Reservar y ver calendario</p>
+                  </div>
+                </div>
+                <ChevronRight className="text-gray-300 group-hover:text-red-500 relative z-10" />
               </button>
-              <button onClick={() => setView('adminLogin')} className="w-full bg-white border-2 border-gray-100 text-gray-800 p-5 rounded-2xl flex items-center justify-between group active:scale-95 transition-all hover:border-gray-300">
-                <div className="flex items-center gap-4"><div className="bg-gray-100 p-2 rounded-lg"><Lock size={24}/></div><div className="text-left"><span className="block font-bold text-lg">Directiva</span><span className="text-xs text-gray-400">Acceso restringido</span></div></div>
-                <ChevronRight className="opacity-30 group-hover:opacity-100 group-hover:translate-x-1 transition-all"/>
+
+              <button 
+                onClick={() => setView('adminLogin')}
+                className="w-full bg-gray-900 text-white p-6 rounded-2xl shadow-xl flex items-center justify-between group active:scale-[0.98] transition-all border border-gray-800"
+              >
+                <div className="flex items-center gap-5">
+                  <div className="p-4 bg-gray-800 rounded-2xl text-gray-300 group-hover:text-white transition-colors border border-gray-700">
+                    <Lock size={28} />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-bold text-xl">Administrador</h3>
+                    <p className="text-xs text-gray-400 font-medium mt-0.5">Acceso Junta Directiva</p>
+                  </div>
+                </div>
+                <ChevronRight className="text-gray-600 group-hover:text-white" />
               </button>
             </div>
-            <p className="mt-12 text-xs text-gray-300 font-medium">© 2025 Aplicación Oficial</p>
+            
+            <div className="mt-16 text-center opacity-40">
+              <p className="text-[10px] font-bold tracking-widest uppercase">Aplicación Oficial</p>
+              <p className="text-[10px]">© 2025 P.U.D. Roteña</p>
+            </div>
           </div>
         )}
 
         {view === 'calendar' && (
-          <div className="p-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="flex justify-between items-center mb-6 bg-gray-50 p-2 rounded-xl">
-                <button onClick={() => changeMonth('prev')} className="p-2 hover:bg-white rounded-lg shadow-sm transition-all"><ChevronRight className="rotate-180" size={20}/></button>
-                <h2 className="text-lg font-black text-gray-800 uppercase tracking-wider">{currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
-                <button onClick={() => changeMonth('next')} className="p-2 hover:bg-white rounded-lg shadow-sm transition-all"><ChevronRight size={20}/></button>
+          <div className="p-4 space-y-6 animate-fade-in pb-20">
+             <div className="flex justify-between items-center mb-2 bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                <button onClick={() => changeMonth('prev')} className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors"><ChevronRight className="rotate-180" size={20}/></button>
+                <h2 className="text-lg font-black text-gray-800 uppercase tracking-wide">
+                    {currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                </h2>
+                <button onClick={() => changeMonth('next')} className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors"><ChevronRight size={20}/></button>
              </div>
-             
+
              {renderCalendar()}
 
-             <div className="flex justify-center gap-6 mt-8 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border-2 border-gray-200"></div> Libre</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-orange-100 border-2 border-orange-300"></div> Reservado</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-100 border-2 border-red-300"></div> Ocupado</div>
+             <div className="grid grid-cols-3 gap-3 text-xs text-center mt-6">
+                <div className="flex flex-col items-center gap-2 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="w-4 h-4 rounded-full bg-green-500 shadow-sm ring-2 ring-green-100"></div>
+                    <span className="font-bold text-gray-600">Libre</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="w-4 h-4 rounded-full bg-orange-400 shadow-sm ring-2 ring-orange-100"></div>
+                    <span className="font-bold text-gray-600">Pendiente</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="w-4 h-4 rounded-full bg-red-500 shadow-sm ring-2 ring-red-100"></div>
+                    <span className="font-bold text-gray-600">Pagado</span>
+                </div>
+             </div>
+             
+             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-900 flex items-start gap-3 mt-4">
+                <Info className="shrink-0 text-blue-600 mt-0.5" size={18}/>
+                <p className="leading-relaxed">Las reservas se realizan por <strong>Fin de Semana completo</strong>. Toca un día <strong className="text-green-600">VERDE</strong> para empezar.</p>
              </div>
           </div>
         )}
 
         {view === 'rules' && (
-          <div className="p-6 pb-20 space-y-6 animate-in slide-in-from-right duration-300">
-             <div className="flex items-center gap-3 text-red-900 mb-6"><Shield size={28}/><h2 className="text-2xl font-black">Normativa</h2></div>
-             <section className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4 text-sm text-gray-600 leading-relaxed">
-                <div><h3 className="font-bold text-gray-900 mb-1">1. Uso Exclusivo</h3><p>La caseta es para uso personal de socios, hijos o nietos. El responsable único es el SOCIO titular.</p></div>
-                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100"><h3 className="font-bold text-yellow-900 mb-2 flex items-center gap-2"><Euro size={16}/> Tarifas y Pagos</h3><div className="flex justify-between items-center mb-2"><span className="text-gray-600">Socio</span><span className="font-bold text-lg text-gray-900">100€</span></div><div className="flex justify-between items-center border-t border-yellow-200 pt-2"><span className="text-gray-600">No Socio</span><span className="font-bold text-lg text-gray-900">300€</span></div><p className="text-xs text-yellow-700 mt-3 font-medium">* El pago debe realizarse en máx. 5 días.</p></div>
-                <div><h3 className="font-bold text-gray-900 mb-1">2. Cancelaciones</h3><ul className="list-disc pl-4 space-y-1"><li>Con aviso previo (10 días): Devolución posible.</li><li>Larga duración: Aviso con 1 mes.</li></ul></div>
-             </section>
-             <button onClick={() => setView('calendar')} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold">Volver</button>
+          <div className="p-5 pb-20 space-y-6 text-gray-700 text-sm leading-relaxed overflow-y-auto h-full animate-fade-in">
+              <div className="flex items-center justify-between border-b pb-4 sticky top-0 bg-gray-50 z-10">
+                <h2 className="text-xl font-bold text-red-900">Normativa</h2>
+                <button onClick={() => setView('calendar')} className="bg-white border border-gray-200 p-2 rounded-full shadow-sm text-gray-600"><X size={20}/></button>
+              </div>
+              
+              <section className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-2"><User size={18} className="text-red-700"/> 1. Uso exclusivo</h3>
+                  <p>El socio podrá solicitar la caseta para actos personales, de hijos o nietos. El responsable siempre será el SOCIO.</p>
+              </section>
+
+              <section className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-2"><Euro size={18} className="text-red-700"/> 2. Pagos y Reservas</h3>
+                  <p className="bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-yellow-900 text-xs mb-3">
+                      <AlertTriangle size={14} className="inline mr-1"/> La reserva no es efectiva hasta el ingreso. <strong>Plazo máximo de 5 días</strong>.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 text-center">
+                    <div className="bg-gray-50 p-2 rounded-lg border">
+                        <span className="block text-xs text-gray-500">Socio</span>
+                        <span className="font-bold text-lg">100€</span>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-lg border">
+                        <span className="block text-xs text-gray-500">No Socio</span>
+                        <span className="font-bold text-lg">300€</span>
+                    </div>
+                  </div>
+              </section>
+
+              <section className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-2"><XCircle size={18} className="text-red-700"/> 3. Cancelaciones</h3>
+                  <ul className="space-y-2 text-xs">
+                      <li className="flex gap-2"><span className="text-red-500">•</span> Aviso con 10 días tras alquiler: Devolución posible.</li>
+                      <li className="flex gap-2"><span className="text-red-500">•</span> Largo plazo ({'>'}3 meses): Aviso con 1 mes de antelación.</li>
+                      <li className="flex gap-2"><span className="text-red-500">•</span> Fuerza mayor: Sin penalización.</li>
+                  </ul>
+              </section>
+
+              <section className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-2"><Key size={18} className="text-red-700"/> 4. Llaves y Fianza</h3>
+                  <p className="mb-2"><strong>Fianza:</strong> 50€ a depositar al recoger la llave.</p>
+                  <div className="text-xs bg-gray-50 p-3 rounded-lg space-y-1">
+                    <p><strong>Recogida:</strong> JUEVES (sin excepción).</p>
+                    <p><strong>Devolución:</strong> Lunes o Martes siguiente.</p>
+                    <p>Día adicional: 30€.</p>
+                  </div>
+              </section>
+
+              <button onClick={() => setView('calendar')} className="w-full mt-4 py-4 bg-red-900 text-white rounded-xl font-bold shadow-lg">
+                  Volver al Calendario
+              </button>
           </div>
         )}
 
-        {view === 'adminLogin' && (
-            <div className="p-6 min-h-[80vh] flex flex-col justify-center animate-in zoom-in-95">
-                <button onClick={() => setView('landing')} className="absolute top-6 left-6 p-2 bg-gray-100 rounded-full"><ChevronRight className="rotate-180" size={20}/></button>
-                <div className="text-center mb-8"><div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl text-white"><Lock size={28}/></div><h2 className="text-2xl font-black text-gray-900">Acceso Directiva</h2><p className="text-gray-400 text-sm">Introduce tus credenciales</p></div>
-                <form onSubmit={handleLogin} className="space-y-4">
-                    <input type="text" placeholder="ID Socio" className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-gray-900 rounded-xl p-4 font-bold text-center outline-none transition-all" value={adminUser.id} onChange={e => setAdminUser({...adminUser, id: e.target.value})}/>
-                    <input type="password" placeholder="Contraseña" className="w-full bg-gray-50 border-2 border-transparent focus:bg-white focus:border-gray-900 rounded-xl p-4 font-bold text-center outline-none transition-all" value={adminUser.pass} onChange={e => setAdminUser({...adminUser, pass: e.target.value})}/>
-                    <button type="submit" className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-red-700 active:scale-95 transition-all">Entrar</button>
-                </form>
-            </div>
-        )}
-        
         {view === 'adminPanel' && (
           <AdminPanel 
-            admins={admins} onExit={() => setView('calendar')} 
-            onAddAdmin={() => handleAdminActions('addAdmin', newAdminData)}
-            onDeleteAdmin={(id) => handleAdminActions('deleteAdmin', id)}
-            onUpdateAdminPass={(id, newPass) => handleAdminActions('updatePass', {id, newPass})}
-            newAdminData={newAdminData} setNewAdminData={setNewAdminData} currentAdminId={currentAdminId}
+            admins={admins} 
+            onExit={() => setView('calendar')} 
+            onAddAdmin={handleAddAdmin}
+            onDeleteAdmin={handleDeleteAdmin}
+            onUpdateAdminPass={handleUpdateAdminPass}
+            newAdminData={newAdminData}
+            setNewAdminData={setNewAdminData}
+            currentAdminId={currentAdminId}
           />
         )}
+
+        {view === 'adminLogin' && (
+            <div className="flex flex-col items-center justify-center min-h-[80vh] px-6 animate-fade-in">
+                <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-gray-100">
+                    <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg text-white">
+                        <Lock size={32}/>
+                    </div>
+                    <h2 className="text-2xl font-black text-center text-gray-900 mb-1">Acceso Directiva</h2>
+                    <p className="text-center text-gray-400 text-sm mb-8">Solo personal autorizado</p>
+                    
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div>
+                            <input 
+                                type="text" 
+                                placeholder="Nº Socio"
+                                className="w-full border-2 border-gray-100 bg-gray-50 rounded-xl p-4 text-base font-bold outline-none focus:border-gray-900 focus:bg-white transition-all text-center"
+                                value={adminUser.id}
+                                onChange={e => setAdminUser({...adminUser, id: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <input 
+                                type="password" 
+                                placeholder="Contraseña"
+                                className="w-full border-2 border-gray-100 bg-gray-50 rounded-xl p-4 text-base font-bold outline-none focus:border-gray-900 focus:bg-white transition-all text-center"
+                                value={adminUser.pass}
+                                onChange={e => setAdminUser({...adminUser, pass: e.target.value})}
+                            />
+                        </div>
+                        <button type="submit" className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-black text-lg shadow-lg active:scale-[0.98] transition-all mt-2">
+                            Entrar
+                        </button>
+                    </form>
+                    <button onClick={() => setView('landing')} className="w-full text-center mt-6 text-sm text-gray-400 font-bold hover:text-gray-600">Cancelar</button>
+                </div>
+            </div>
+        )}
+
       </main>
 
       <Modal 
-        isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}
-        selectedBlock={selectedBlock} formData={formData} setFormData={setFormData}
-        onReservation={handleReservation} isAdminLoggedIn={isAdminLoggedIn}
-        onConfirmPayment={() => handleAdminActions('confirmPay')}
-        onCancelReservation={() => handleAdminActions('cancelRes')}
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        selectedBlock={selectedBlock}
+        formData={formData}
+        setFormData={setFormData}
+        onReservation={handleReservation}
+        isAdminLoggedIn={isAdminLoggedIn}
+        onConfirmPayment={handleConfirmPayment}
+        onCancelReservation={handleCancelReservation}
       />
+
     </div>
   );
 }
