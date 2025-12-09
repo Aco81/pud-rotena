@@ -40,7 +40,6 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE FIREBASE ---
-// Configuración de respaldo por si falla la del entorno
 const fallbackConfig = {
   apiKey: "AIzaSyA1MuetIpVz6ki2_mdhf4J831oMB8pw39A",
   authDomain: "rotena-519e4.firebaseapp.com",
@@ -52,10 +51,12 @@ const fallbackConfig = {
 };
 
 let app, auth, db;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'rotena-app-default';
+
+// CORRECCIÓN CRÍTICA: Sanitizamos el appId para evitar barras '/' que rompen la ruta de Firebase
+const rawAppId = typeof __app_id !== 'undefined' ? __app_id : 'rotena-app-default';
+const appId = rawAppId.replace(/[^a-zA-Z0-9_-]/g, '_'); 
 
 try {
-  // Intentamos usar la config del entorno, si no, usamos la de respaldo
   const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackConfig;
   
   if (firebaseConfig) {
@@ -397,29 +398,33 @@ export default function App() {
   useEffect(() => {
     if (!user || !db) return;
     
-    // Reservas
-    const unsubRes = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'reservations')), (snap) => {
+    // CORRECCIÓN: Manejo de errores en onSnapshot
+    const reservationsQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'reservations'));
+    const unsubRes = onSnapshot(reservationsQuery, (snap) => {
       const resData = [];
       const now = new Date();
       snap.forEach((d) => {
         const data = d.data();
-        // Limpieza automática de reservas caducadas (más de 5 días sin pagar)
         if (data.status === 'pending' && data.createdAt) {
           if ((now - data.createdAt.toDate()) / (86400000) > 5) {
-             deleteDoc(d.ref); // Auto-borrar
+             deleteDoc(d.ref); 
              return;
           }
         }
         resData.push({ id: d.id, ...data });
       });
       setReservations(resData);
+    }, (error) => {
+        console.error("Error cargando reservas:", error);
     });
 
-    // Admins
-    const unsubAdmins = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'admins')), (snap) => {
+    const adminsQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'admins'));
+    const unsubAdmins = onSnapshot(adminsQuery, (snap) => {
       const adData = [];
       snap.forEach(d => adData.push({ id: d.id, ...d.data() }));
       setAdmins(adData);
+    }, (error) => {
+        console.error("Error cargando admins:", error);
     });
 
     return () => { unsubRes(); unsubAdmins(); };
@@ -473,7 +478,6 @@ export default function App() {
       } catch(e) { console.error(e); }
   };
 
-  // --- RENDER CALENDAR (LA PIEZA QUE FALTABA) ---
   const renderCalendar = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -488,8 +492,6 @@ export default function App() {
     
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d);
-      const blockStart = getBlockStart(date);
-      const blockId = formatDateId(blockStart);
       const activeRes = reservations.find(r => isDateInBlock(date, r.startDate));
       
       let statusClass = 'bg-white border-gray-100 hover:border-red-300';
