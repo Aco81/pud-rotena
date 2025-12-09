@@ -4,12 +4,49 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>P.U.D. Roteña</title>
+    
+    <!-- SCRIPT DE EMERGENCIA PARA VER ERRORES EN EL MÓVIL -->
+    <script>
+      window.onerror = function (msg, url, lineNo, columnNo, error) {
+        var errorBox = document.getElementById('error-box');
+        if (!errorBox) {
+          errorBox = document.createElement('div');
+          errorBox.id = 'error-box';
+          errorBox.style.position = 'fixed';
+          errorBox.style.top = '0';
+          errorBox.style.left = '0';
+          errorBox.style.width = '100%';
+          errorBox.style.height = '100%';
+          errorBox.style.backgroundColor = '#0000aa'; // Pantalla Azul
+          errorBox.style.color = '#ffffff';
+          errorBox.style.zIndex = '999999';
+          errorBox.style.padding = '20px';
+          errorBox.style.fontFamily = 'monospace';
+          errorBox.style.fontSize = '14px';
+          errorBox.style.whiteSpace = 'pre-wrap';
+          errorBox.style.overflow = 'auto';
+          document.body.appendChild(errorBox);
+        }
+        var message = [
+          'ERROR CRÍTICO DETECTADO:',
+          'Mensaje: ' + msg,
+          'Archivo: ' + url,
+          'Línea: ' + lineNo,
+          'Columna: ' + columnNo,
+          'Stack: ' + (error ? error.stack : 'N/A')
+        ].join('\n\n');
+        
+        errorBox.innerText = message;
+        return false;
+      };
+      console.log("Global Error Handler instalado.");
+    </script>
+    
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>
     <div id="root"></div>
-    
-    <!-- CONEXIÓN NUEVA: Apuntamos al archivo renombrado -->
+    <!-- Apuntamos a boot.jsx -->
     <script type="module" src="/src/boot.jsx"></script>
   </body>
 </html>
